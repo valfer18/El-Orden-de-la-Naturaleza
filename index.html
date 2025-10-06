@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clasificación de Ciencias</title>
+    <!-- Incluimos Tailwind CSS para un diseño moderno y responsivo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Configuraciones de fuente y color general */
+        :root {
+            --primary-color: #2e8b57; /* Verde Marino */
+            --secondary-color: #f7a325; /* Naranja Brillante */
+            --text-color: #1e3a8a; /* Azul Oscuro */
+            --bg-color: #ecfdf5; /* Verde muy claro */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden; /* Evita el scroll innecesario */
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 420px; /* Tamaño típico de móvil */
+            height: 100vh;
+            max-height: 850px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            border: 4px solid var(--primary-color);
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+            position: relative;
+        }
+
+        /* Estilo para las palabras arrastrables (Pentágonos) */
+        .draggable-word {
+            position: absolute;
+            background-color: var(--secondary-color);
+            color: white;
+            font-weight: bold;
+            padding: 10px 15px;
+            border-radius: 8px; /* Usaremos un borde redondeado simple en lugar de un pentágono complejo para la funcionalidad */
+            text-align: center;
+            cursor: grab;
+            user-select: none;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            transition: transform 0.1s ease-out, opacity 0.3s ease;
+            min-width: 80px;
+            z-index: 10;
+        }
+
+        /* Efecto de sombra al arrastrar */
+        .dragging {
+            opacity: 0.8;
+            transform: scale(1.1);
+            z-index: 20;
+        }
+
+        /* Zona de caída y Clasificación */
+        .drop-zone {
+            flex: 1; /* Ocupa la mayor parte del espacio */
+            position: relative;
+            overflow: hidden;
+            border-bottom: 2px solid var(--primary-color);
+        }
+
+        .classification-container {
+            height: 150px; /* Altura fija para las cajas de clasificación */
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
+            padding: 5px;
+            background-color: var(--primary-color);
+        }
+
+        .classification-box {
+            background-color: #fff;
+            border: 2px solid var(--secondary-color);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            color: var(--text-color);
+            font-size: 0.75rem; /* Ajuste para móvil */
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+
+        /* Efecto al pasar sobre la caja */
+        .classification-box.drag-over {
+            background-color: #ffedc2; /* Amarillo claro */
+            border-color: #d97706; /* Naranja oscuro */
+        }
+
+        /* Pantallas de estado (Inicio/Fin) */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            text-align: center;
+            z-index: 50;
+            color: white;
+            border-radius: 12px;
+        }
+
+        .btn-primary {
+            background-color: var(--secondary-color);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 9999px; /* Píldora */
+            font-weight: bold;
+            margin-top: 20px;
+            box-shadow: 0 5px 0 #d97706; /* Sombra de botón 3D */
+            transition: all 0.1s;
+        }
+
+        .btn-primary:active {
+            box-shadow: 0 2px 0 #d97706;
+            transform: translateY(3px);
+        }
+
+        /* Estilos de Feedback */
+        .feedback {
+            position: absolute;
+            font-size: 2rem;
+            font-weight: 900;
+            opacity: 0;
+            transition: transform 0.5s, opacity 0.5s;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .feedback.correct {
+            color: #10b981; /* Verde esmeralda */
+            transform: translateY(-50px) scale(1.5);
+        }
+
+        .feedback.incorrect {
+            color: #ef4444; /* Rojo */
+            transform: translateY(-50px) scale(1.5);
+        }
+
+        /* Estilo para las métricas (Puntuación/Tiempo) */
+        .metrics {
+            padding: 8px;
+            background-color: #d1fae5;
+            color: var(--text-color);
+            display: flex;
+            justify-content: space-around;
+            font-weight: 700;
+            font-size: 1rem;
+            border-bottom: 2px solid var(--primary-color);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+
+        <!-- Contenedor de Métricas (Puntuación y Tiempo) -->
+        <div class="metrics">
+            <div id="score-display">Puntos: 0</div>
+            <div id="timer-display">Tiempo: 60s</div>
+        </div>
+
+        <!-- Pantalla de Inicio -->
+        <div id="start-screen" class="overlay">
+            <h1 class="text-3xl font-extrabold mb-4">Clasificación de Especies de C.R.</h1>
+            <p class="text-xl mb-6">Arrastra las palabras a la caja de clasificación correcta.</p>
+            <p class="mb-4">Tienes 60 segundos. Ganas 10 puntos por acierto, pierdes 10 por error.</p>
+            <button id="start-button" class="btn-primary">¡Comenzar Juego!</button>
+        </div>
+
+        <!-- Pantalla de Fin de Juego -->
+        <div id="end-screen" class="overlay hidden">
+            <h1 id="end-title" class="text-4xl font-extrabold mb-4">¡Juego Terminado!</h1>
+            <p id="final-score" class="text-3xl mb-6">Puntuación Final: 0</p>
+            <button id="restart-button" class="btn-primary">Jugar de Nuevo</button>
+        </div>
+
+        <!-- Zona donde caen los elementos (Drop Zone) -->
+        <div id="drop-zone" class="drop-zone">
+            <!-- Los elementos arrastrables se insertan aquí por JS -->
+        </div>
+
+        <!-- Contenedor de las Cajas de Clasificación (Drop Targets) -->
+        <div id="classification-container" class="classification-container">
+            <!-- Las cajas se insertan aquí por JS -->
+        </div>
+    </div>
+
+    <script type="module">
+        // =========================================================
+        // 1. CONFIGURACIÓN DEL JUEGO (Editable: Contenido y Reglas)
+        // =========================================================
+        const GAME_DURATION = 60; // Duración en segundos (1 minuto)
+        const SCORE_CORRECT = 10;
+        const SCORE_INCORRECT = -10;
+        
+        // ** DATOS EDITABLES DEL CURRÍCULO **
+        // Cambia este objeto para actualizar el contenido del juego cada año.
+        // La clave (key) es la categoría (caja de clasificación).
+        // El valor (value) es un array de palabras/conceptos a clasificar.
+        const GAME_DATA = {
+            "REPTILES": ["Serpiente de coral", "Tortuga verde", "Iguana", "Cocodrilo"],
+            "MAMÍFEROS": ["Perezoso", "Jaguar", "Mono aullador", "Tapir"],
+            "INSECTOS": ["Mariposa morpho", "Abeja", "Hormiga bala", "Mantis"],
+            "AVES": ["Quetzal", "Tucán", "Lapa roja", "Colibrí"]
+        };
+        // Fin de DATOS EDITABLES
+
+        // =========================================================
+        // 2. ESTADO DEL JUEGO Y VARIABLES GLOBALES
+        // =========================================================
+        const state = {
+            score: 0,
+            timeLeft: GAME_DURATION,
+            isRunning: false,
+            timerInterval: null,
+            draggedItem: null, // Referencia al elemento que se está arrastrando
+            currentWords: [], // Palabras actualmente visibles en la zona de caída
+            availableWords: [], // Palabras restantes en el pool
+            categories: Object.keys(GAME_DATA),
+            targetCategory: null // Categoría correcta del elemento arrastrado
+        };
+
+        // =========================================================
+        // 3. SELECCIÓN DE ELEMENTOS DEL DOM
+        // =========================================================
+        const dropZone = document.getElementById('drop-zone');
+        const classificationContainer = document.getElementById('classification-container');
+        const scoreDisplay = document.getElementById('score-display');
+        const timerDisplay = document.getElementById('timer-display');
+        const startScreen = document.getElementById('start-screen');
+        const endScreen = document.getElementById('end-screen');
+        const endTitle = document.getElementById('end-title');
+        const finalScore = document.getElementById('final-score');
+        const startButton = document.getElementById('start-button');
+        const restartButton = document.getElementById('restart-button');
+
+        // =========================================================
+        // 4. FUNCIONES DE LÓGICA DEL JUEGO
+        // =========================================================
+
+        /**
+         * Inicializa el array de palabras disponibles y las mezcla.
+         */
+        function initializeWords() {
+            state.availableWords = [];
+            for (const category in GAME_DATA) {
+                GAME_DATA[category].forEach(word => {
+                    state.availableWords.push({
+                        word: word,
+                        category: category
+                    });
+                });
+            }
+            // Mezclar las palabras para que aparezcan en orden aleatorio
+            state.availableWords.sort(() => Math.random() - 0.5);
+        }
+
+        /**
+         * Actualiza el marcador en la interfaz.
+         */
+        function updateScore(points) {
+            state.score += points;
+            scoreDisplay.textContent = `Puntos: ${state.score}`;
+            showFeedback(points);
+        }
+
+        /**
+         * Muestra una retroalimentación visual (acierto/error) en pantalla.
+         */
+        function showFeedback(points) {
+            const feedback = document.createElement('div');
+            feedback.classList.add('feedback');
+            
+            if (points > 0) {
+                feedback.textContent = `+${points}`;
+                feedback.classList.add('correct');
+            } else {
+                feedback.textContent = points;
+                feedback.classList.add('incorrect');
+            }
+
+            // Coloca el feedback en una posición aleatoria de la zona de caída
+            const x = Math.random() * (dropZone.offsetWidth - 100) + 50;
+            const y = Math.random() * (dropZone.offsetHeight - 100) + 50;
+            feedback.style.left = `${x}px`;
+            feedback.style.top = `${y}px`;
+            
+            dropZone.appendChild(feedback);
+
+            // Inicia la animación de desvanecimiento y movimiento
+            setTimeout(() => {
+                feedback.style.opacity = '1';
+                feedback.style.transform = 'translateY(-50px) scale(1.5)';
+            }, 10); // Un pequeño retraso para asegurar la transición
+
+            // Elimina el elemento después de la animación
+            setTimeout(() => {
+                feedback.style.opacity = '0';
+                dropZone.removeChild(feedback);
+            }, 500);
+        }
+
+        /**
+         * Inicia el temporizador de la partida.
+         */
+        function startTimer() {
+            state.timeLeft = GAME_DURATION;
+            timerDisplay.textContent = `Tiempo: ${state.timeLeft}s`;
+
+            state.timerInterval = setInterval(() => {
+                state.timeLeft--;
+                timerDisplay.textContent = `Tiempo: ${state.timeLeft}s`;
+
+                if (state.timeLeft <= 0) {
+                    endGame(true); // El juego termina por tiempo
+                }
+            }, 1000);
+        }
+
+        /**
+         * Crea un nuevo elemento arrastrable (palabra) y lo añade a la zona de caída.
+         */
+        function createNewWord() {
+            if (state.availableWords.length === 0) {
+                // Si no quedan palabras, terminamos el juego si no hay palabras en pantalla
+                if (state.currentWords.length === 0) {
+                    endGame(false); 
+                }
+                return;
+            }
+
+            // Extrae la próxima palabra del pool
+            const itemData = state.availableWords.shift();
+            
+            const wordElement = document.createElement('div');
+            wordElement.classList.add('draggable-word');
+            wordElement.textContent = itemData.word;
+            wordElement.dataset.correctCategory = itemData.category; // Guarda la categoría correcta
+            wordElement.setAttribute('draggable', true);
+            
+            // Posición inicial aleatoria en la parte superior de la zona de caída
+            const xPos = Math.random() * (dropZone.offsetWidth - 100);
+            wordElement.style.left = `${Math.max(20, xPos)}px`;
+            wordElement.style.top = `0px`;
+
+            dropZone.appendChild(wordElement);
+            state.currentWords.push(wordElement);
+
+            // Simular un efecto de "caída" suave
+            setTimeout(() => {
+                 // Posición de caída final aleatoria (entre 50px y la mitad de la zona)
+                 const dropY = Math.random() * (dropZone.offsetHeight / 2 - 50) + 50;
+                 wordElement.style.transition = 'top 3s ease-out';
+                 wordElement.style.top = `${dropY}px`;
+            }, 50);
+
+            // Volver a generar una palabra después de un tiempo (para simular la 'lluvia')
+            setTimeout(createNewWord, 2000); 
+
+            // Configurar eventos de arrastrar y soltar
+            wordElement.addEventListener('dragstart', handleDragStart);
+            // También configurar eventos táctiles para móvil
+            wordElement.addEventListener('touchstart', handleTouchStart, { passive: false });
+        }
+
+        /**
+         * Renderiza las cajas de clasificación en la parte inferior.
+         */
+        function renderClassificationBoxes() {
+            state.categories.forEach(category => {
+                const box = document.createElement('div');
+                box.classList.add('classification-box');
+                box.dataset.category = category; // Identificador para la validación
+                box.innerHTML = `<span>${category}</span>`;
+                
+                // Configurar eventos de caída
+                box.addEventListener('dragover', handleDragOver);
+                box.addEventListener('dragleave', handleDragLeave);
+                box.addEventListener('drop', handleDrop);
+
+                // También configurar eventos táctiles
+                box.addEventListener('touchmove', handleTouchMove, { passive: false });
+                box.addEventListener('touchend', handleTouchEnd);
+
+                classificationContainer.appendChild(box);
+            });
+        }
+
+        /**
+         * Lógica al terminar el juego.
+         * @param {boolean} isTimeUp - Indica si terminó por tiempo (true) o por completar las palabras (false).
+         */
+        function endGame(isTimeUp) {
+            if (!state.isRunning) return; // Evitar llamadas múltiples
+
+            state.isRunning = false;
+            clearInterval(state.timerInterval);
+
+            // Limpiar elementos arrastrables
+            state.currentWords.forEach(word => word.remove());
+            state.currentWords = [];
+
+            // Actualizar pantalla final
+            endScreen.classList.remove('hidden');
+            finalScore.textContent = `Puntuación Final: ${state.score}`;
+            
+            if (state.score >= 50 && !isTimeUp) {
+                endTitle.textContent = "¡Felicidades, Ganaste!";
+                endTitle.classList.add('text-green-400');
+            } else if (isTimeUp) {
+                 endTitle.textContent = "¡Tiempo Agotado!";
+                 endTitle.classList.add('text-red-400');
+            } else {
+                endTitle.textContent = "¡Buen Intento, sigue practicando!";
+                endTitle.classList.add('text-yellow-400');
+            }
+
+            startScreen.classList.add('hidden');
+        }
+
+        // =========================================================
+        // 5. MANEJO DE EVENTOS DRAG & DROP (Escritorio)
+        // =========================================================
+
+        function handleDragStart(e) {
+            state.draggedItem = this;
+            state.targetCategory = this.dataset.correctCategory;
+            // Usamos setTimeout para que la clase se aplique después de que el navegador capture la imagen de arrastre
+            setTimeout(() => this.classList.add('dragging'), 0); 
+            e.dataTransfer.setData('text/plain', this.dataset.correctCategory);
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault(); // Necesario para permitir la caída
+            this.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            this.classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+
+            if (!state.draggedItem) return;
+
+            const droppedCategory = this.dataset.category;
+            
+            if (droppedCategory === state.targetCategory) {
+                // Acierto
+                updateScore(SCORE_CORRECT);
+            } else {
+                // Error
+                updateScore(SCORE_INCORRECT);
+            }
+
+            // Eliminar el elemento arrastrado del DOM y del estado
+            const index = state.currentWords.indexOf(state.draggedItem);
+            if (index > -1) {
+                state.currentWords.splice(index, 1);
+            }
+            state.draggedItem.remove();
+            state.draggedItem = null;
+            state.targetCategory = null;
+
+            // Si ya no quedan palabras y el pool está vacío, terminar
+            if (state.currentWords.length === 0 && state.availableWords.length === 0) {
+                endGame(false);
+            }
+        }
+
+        // =========================================================
+        // 6. MANEJO DE EVENTOS TÁCTILES (Móvil)
+        // =========================================================
+
+        let currentTouchElement = null;
+        let initialX, initialY, currentX, currentY;
+
+        function handleTouchStart(e) {
+            e.preventDefault(); // Evita el scroll o zoom por defecto
+            
+            currentTouchElement = this;
+            currentTouchElement.classList.add('dragging');
+            state.targetCategory = currentTouchElement.dataset.correctCategory;
+            
+            const touch = e.touches[0];
+            initialX = touch.clientX;
+            initialY = touch.clientY;
+
+            // Guardar la posición inicial relativa al contenedor
+            const rect = currentTouchElement.getBoundingClientRect();
+            currentTouchElement.dataset.offsetX = touch.clientX - rect.left;
+            currentTouchElement.dataset.offsetY = touch.clientY - rect.top;
+        }
+
+        function handleTouchMove(e) {
+            e.preventDefault(); // Evita el scroll
+            if (!currentTouchElement) return;
+
+            const touch = e.touches[0];
+            
+            // Calcular nueva posición para el elemento arrastrado
+            const newX = touch.clientX - dropZone.getBoundingClientRect().left - parseFloat(currentTouchElement.dataset.offsetX);
+            const newY = touch.clientY - dropZone.getBoundingClientRect().top - parseFloat(currentTouchElement.dataset.offsetY);
+            
+            currentTouchElement.style.left = `${newX}px`;
+            currentTouchElement.style.top = `${newY}px`;
+            currentTouchElement.style.transition = 'none'; // Deshabilita la transición de caída
+            
+            // Verificar si está sobre una caja de clasificación
+            const boxElements = document.querySelectorAll('.classification-box');
+            let isOverBox = false;
+
+            boxElements.forEach(box => {
+                const boxRect = box.getBoundingClientRect();
+                if (touch.clientX >= boxRect.left && 
+                    touch.clientX <= boxRect.right && 
+                    touch.clientY >= boxRect.top && 
+                    touch.clientY <= boxRect.bottom) {
+                    box.classList.add('drag-over');
+                    isOverBox = true;
+                    // Almacenar temporalmente la caja de destino potencial
+                    currentTouchElement.dataset.potentialDrop = box.dataset.category;
+                } else {
+                    box.classList.remove('drag-over');
+                }
+            });
+
+            if (!isOverBox) {
+                currentTouchElement.dataset.potentialDrop = '';
+            }
+        }
+
+        function handleTouchEnd(e) {
+            if (!currentTouchElement) return;
+
+            currentTouchElement.classList.remove('dragging');
+            currentTouchElement.style.transition = 'transform 0.1s ease-out, opacity 0.3s ease'; // Restaurar transición
+            
+            const droppedCategory = currentTouchElement.dataset.potentialDrop;
+            
+            // Revertir el efecto visual de arrastrar sobre cajas
+            document.querySelectorAll('.classification-box').forEach(box => {
+                box.classList.remove('drag-over');
+            });
+
+            if (droppedCategory) {
+                // Hay una categoría de destino válida
+                if (droppedCategory === state.targetCategory) {
+                    updateScore(SCORE_CORRECT);
+                } else {
+                    updateScore(SCORE_INCORRECT);
+                }
+
+                // Eliminar el elemento
+                const index = state.currentWords.indexOf(currentTouchElement);
+                if (index > -1) {
+                    state.currentWords.splice(index, 1);
+                }
+                currentTouchElement.remove();
+
+                // Revisar fin del juego
+                if (state.currentWords.length === 0 && state.availableWords.length === 0) {
+                    endGame(false);
+                }
+            } else {
+                // Si se soltó fuera de cualquier caja, regresa a la posición
+                // o simplemente se queda donde cayó (la posición ya fue actualizada en touchmove)
+                // Aquí podrías agregar lógica de rebote si lo deseas
+            }
+
+            currentTouchElement = null;
+            state.targetCategory = null;
+        }
+
+        // =========================================================
+        // 7. FLUJO DEL JUEGO
+        // =========================================================
+
+        /**
+         * Resetea el estado del juego e inicia una nueva partida.
+         */
+        function startGame() {
+            state.score = 0;
+            state.timeLeft = GAME_DURATION;
+            state.isRunning = true;
+            
+            scoreDisplay.textContent = `Puntos: ${state.score}`;
+            timerDisplay.textContent = `Tiempo: ${state.timeLeft}s`;
+
+            // Limpiar las clases de pantalla final
+            endTitle.classList.remove('text-green-400', 'text-red-400', 'text-yellow-400');
+            
+            // Ocultar pantallas
+            startScreen.classList.add('hidden');
+            endScreen.classList.add('hidden');
+
+            initializeWords(); // Carga las palabras del JSON
+            startTimer();
+            // Crear la primera tanda de palabras iniciales (o una sola)
+            createNewWord();
+        }
+
+        /**
+         * Función principal de inicialización que se ejecuta al cargar la página.
+         */
+        function init() {
+            renderClassificationBoxes();
+            
+            startButton.addEventListener('click', startGame);
+            restartButton.addEventListener('click', startGame);
+
+            // Asegurarse de que la pantalla de inicio sea visible al principio
+            startScreen.classList.remove('hidden');
+        }
+
+        window.onload = init;
+
+    </script>
+</body>
+</html>
