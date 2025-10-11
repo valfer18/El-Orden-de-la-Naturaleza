@@ -1,10 +1,15 @@
-// Variables de configuración, se llenarán tras cargar data.json
+// Variables de configuración del juego
 let GAME_DURATION;
 let SCORE_CORRECT;
 let SCORE_INCORRECT;
 let FALL_SPEED;
 let WORD_CREATION_INTERVAL;
 let GAME_DATA;
+
+// --- Configuración de la API ---
+const API_CONFIG = {
+    BASE_URL: 'https://puramentebackend.onrender.com/api/gamedata/game/7/category/ciencias'
+};
 
 // =========================================================
 // 1. ESTADO DEL JUEGO Y VARIABLES GLOBALES
@@ -53,7 +58,126 @@ function playSoundFX(audioElement) {
 
 
 // =========================================================
-// 2. SELECCIÓN DE ELEMENTOS DEL DOM
+// 2. FUNCIONES PARA CARGAR DATOS DE LA API
+// =========================================================
+
+function showLoadingMessage(message) {
+    // Crear o actualizar mensaje de carga
+    let loadingElement = document.getElementById('loading-message');
+    if (!loadingElement) {
+        loadingElement = document.createElement('div');
+        loadingElement.id = 'loading-message';
+        loadingElement.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 10000;
+            text-align: center;
+        `;
+        document.body.appendChild(loadingElement);
+    }
+    loadingElement.textContent = message;
+    loadingElement.style.display = 'block';
+}
+
+function hideLoadingMessage() {
+    const loadingElement = document.getElementById('loading-message');
+    if (loadingElement) {
+        loadingElement.style.display = 'none';
+    }
+}
+
+async function loadGameDataFromAPI() {
+    const response = await fetch(API_CONFIG.BASE_URL);
+    const apiData = await response.json();
+    
+    // Transformar la estructura de la API al formato que usa el juego
+    const gameTopics = {};
+    
+    apiData.data.forEach(item => {
+        // Extraer los datos de cada subcategoría
+        Object.keys(item.gamedata).forEach(subject => {
+            gameTopics[subject] = item.gamedata[subject];
+        });
+    });
+    
+    return gameTopics;
+}
+
+// --- Función principal para cargar datos del juego ---
+async function loadGameData() {
+    const gameData = await loadGameDataFromAPI();
+    return gameData;
+}
+
+// =========================================================
+// 3. FUNCIONES PARA ENVIAR DATOS AL API
+// =========================================================
+
+// --- Función para extraer user_id de la URL ---
+function getUserIdFromURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const userId = urlParams.get('user_id');
+    return userId ? parseInt(userId) : null;
+}
+
+// --- Función para mostrar indicador de envío de datos ---
+
+
+// --- Función para ocultar indicador de envío de datos ---
+function hideDataSendingIndicator() {
+    hideLoadingMessage();
+}
+
+// --- Función para actualizar texto del indicador ---
+function updateLoadingText(message) {
+    const loadingElement = document.getElementById('loading-message');
+    if (loadingElement) {
+        loadingElement.textContent = message;
+    }
+}
+
+// --- Función para guardar datos del juego ---
+function saveGameData(data) {
+    // Verificar que exista user_id antes de proceder
+    if (!data.user_id) {
+        console.log('No hay user_id disponible. No se enviarán datos al servidor.');
+        return;
+    }
+    
+    console.log("Datos del juego guardados:", JSON.stringify(data, null, 2));
+    
+    // Guardar en localStorage como respaldo
+    localStorage.setItem('lastGameData', JSON.stringify(data));
+    
+    
+    
+    // Enviar datos a la API
+    fetch('https://puramentebackend.onrender.com/api/game-attempts/from-game', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Datos enviados exitosamente:', data);
+    })
+    .catch(error => {
+        console.error('Error enviando datos:', error); // Ocultar después de 3 segundos
+    });
+    
+    return data; // Retorna los datos para que puedas usarlos si necesitas
+}
+
+// =========================================================
+// 4. SELECCIÓN DE ELEMENTOS DEL DOM
 // =========================================================
 const dropZone = document.getElementById('drop-zone');
 const classificationContainer = document.getElementById('classification-container');
@@ -74,7 +198,7 @@ const startRecordDisplay = document.getElementById('start-record-display');
 let wordCreationTimeout;
 
 // =========================================================
-// 3. FUNCIONES DE LÓGICA DEL JUEGO
+// 5. FUNCIONES DE LÓGICA DEL JUEGO
 // =========================================================
 
 function initializeWords() {
@@ -265,6 +389,34 @@ function endGame(isTimeUp) {
     }
 
     document.getElementById('game-container').classList.add('hidden');
+    
+    // --- Enviar datos al API ---
+    // Extraer user_id de la URL
+    const userId = getUserIdFromURL();
+    
+    if (userId) {
+        // Calcular tiempo transcurrido
+        const totalTime = GAME_DURATION - state.timeLeft;
+        
+        // Los puntos obtenidos (solo puntos positivos)
+        const correctChallenges = Math.max(0, state.score);
+        
+        // Total de puntos que podía obtener si acertaba todas
+        const maxWords = Object.values(GAME_DATA).flat().length;
+        const totalChallenges = maxWords * SCORE_CORRECT;
+        
+        const gameData = {
+            user_id: userId,
+            game_id: 7,
+            correct_challenges: correctChallenges,
+            total_challenges: totalChallenges,
+            time_spent: totalTime
+        };
+
+        saveGameData(gameData);
+    } else {
+        console.log('No se encontró user_id en la URL. No se enviarán datos al servidor.');
+    }
 }
 
 function handleValidationAndCleanup(droppedCategory, item) {
@@ -350,7 +502,7 @@ function goToStartScreen() {
 
 
 // =========================================================
-// 5. MANEJO DE EVENTOS DRAG & DROP (Escritorio)
+// 7. MANEJO DE EVENTOS DRAG & DROP (Escritorio)
 // =========================================================
 
 function handleDragStart(e) {
@@ -393,7 +545,7 @@ dropZone.addEventListener('drop', (e) => {
 
 
 // =========================================================
-// 6. MANEJO DE EVENTOS TÁCTILES (Móvil)
+// 8. MANEJO DE EVENTOS TÁCTILES (Móvil)
 // =========================================================
 
 function handleTouchStart(e) {
@@ -462,7 +614,7 @@ function handleTouchEnd(e) {
 }
 
 // =========================================================
-// 7. FLUJO DE INICIO Y EJECUCIÓN
+// 9. FLUJO DE INICIO Y EJECUCIÓN
 // =========================================================
 
 function startGame() {
@@ -494,37 +646,26 @@ function startGame() {
 
 async function init() {
     try {
-        const response = await fetch('data.json');
-        if (!response.ok) {
-            // Fallback si data.json no está disponible
-            const fallbackData = {
-                "GAME_CONFIG": {
-                    "GAME_DURATION": 60, "SCORE_CORRECT": 10, "SCORE_INCORRECT": -10,
-                    "FALL_SPEED": 1.5, "WORD_CREATION_INTERVAL": 1500
-                },
-                "GAME_DATA": {
-                    "REPTILES": ["Iguana", "Serpiente", "Cocodrilo"],
-                    "MAMÍFEROS": ["Perro", "Gato"],
-                }
-            };
-            
-            GAME_DURATION = fallbackData.GAME_CONFIG.GAME_DURATION;
-            SCORE_CORRECT = fallbackData.GAME_CONFIG.SCORE_CORRECT;
-            SCORE_INCORRECT = fallbackData.GAME_CONFIG.SCORE_INCORRECT;
-            FALL_SPEED = fallbackData.GAME_CONFIG.FALL_SPEED;
-            WORD_CREATION_INTERVAL = fallbackData.GAME_CONFIG.WORD_CREATION_INTERVAL;
-            GAME_DATA = fallbackData.GAME_DATA;
+        // Configuración por defecto del juego
+        GAME_DURATION = 60;
+        SCORE_CORRECT = 10;
+        SCORE_INCORRECT = 0;
+        FALL_SPEED = 1.5;
+        WORD_CREATION_INTERVAL = 1500;
 
-            console.warn("ADVERTENCIA: No se pudo cargar data.json. Usando datos de fallback integrados.");
+        // Cargar datos del juego desde la API
+        try {
+            GAME_DATA = await loadGameData();
+        } catch (apiError) {
+            console.error("Error al cargar datos desde API:", apiError);
             
-        } else {
-            const config = await response.json();
-            GAME_DURATION = config.GAME_CONFIG.GAME_DURATION;
-            SCORE_CORRECT = config.GAME_CONFIG.SCORE_CORRECT;
-            SCORE_INCORRECT = config.GAME_CONFIG.SCORE_INCORRECT;
-            FALL_SPEED = config.GAME_CONFIG.FALL_SPEED;
-            WORD_CREATION_INTERVAL = config.GAME_CONFIG.WORD_CREATION_INTERVAL;
-            GAME_DATA = config.GAME_DATA;
+            // Fallback con datos básicos
+            GAME_DATA = {
+                "REPTILES": ["Iguana", "Serpiente", "Cocodrilo"],
+                "MAMÍFEROS": ["Perro", "Gato", "Elefante"],
+                "INSECTOS": ["Mariposa", "Hormiga", "Abeja"],
+                "AVES": ["Águila", "Loro", "Pato"]
+            };
         }
 
         state.categories = Object.keys(GAME_DATA);
@@ -546,6 +687,7 @@ async function init() {
         
     } catch (error) {
         console.error("Error fatal en la inicialización:", error);
+        alert("Error al inicializar el juego. Por favor, recarga la página.");
     }
 }
 
