@@ -36,7 +36,7 @@ const sound = {
     // Ganar el juego (victoria)
     win: new Audio('./src/gano.mp3'),
     // Perder el juego (derrota/tiempo agotado)
-    lose: new Audio('./src/perdio.mp3'),
+    lose: new Audio('./src/Perdio.mp3'),
 };
 
 // Configuración de la música
