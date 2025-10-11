@@ -1,0 +1,135 @@
+/* -------------------------------------------------------------------------- */
+/* ESTILOS GENERALES Y LAYOUT */
+/* -------------------------------------------------------------------------- */
+
+body {
+    background-color: #F0F8F0; 
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 10px; 
+    margin: 0; 
+}
+
+.game-card {
+    background: #FFFFFF;
+    border-radius: 20px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    /* Máximo ancho para simular móvil */
+    max-width: 450px; 
+    width: 100%;
+    padding: 0;
+    overflow: hidden;
+    margin: auto; 
+}
+
+/* Zona de caída y juego */
+#drop-zone {
+    position: relative;
+    background: #FAFAFA;
+    border-bottom: 2px solid #E0E0E0;
+    /* Altura ajustada para móvil */
+    height: 300px; 
+    width: 100%;
+    overflow: hidden;
+    transition: opacity 0.3s ease-in-out; 
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* ESTILOS DE ELEMENTOS ARRASTRABLES (HEXÁGONOS) */
+/* -------------------------------------------------------------------------- */
+
+.draggable-word {
+    position: absolute;
+    background-color: #71BC14; 
+    color: white;
+    padding: 8px 16px; 
+    font-size: 0.9rem; 
+    font-weight: 600;
+    cursor: grab;
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.3s;
+    z-index: 10;
+    user-select: none;
+    
+    /* Forma y tamaño ajustados */
+    -webkit-clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    height: 45px; 
+    width: 90px; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.draggable-word.dragging {
+    opacity: 0.8;
+    transform: scale(1.05);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+    cursor: grabbing;
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* ESTILOS DE CAJAS DE CLASIFICACIÓN (ZONAS DE DROP) */
+/* -------------------------------------------------------------------------- */
+
+#classification-container {
+    display: flex;
+    justify-content: space-around;
+    padding: 8px; 
+    background-color: #FFFFFF;
+    border-top: 1px solid #EDEDED;
+}
+
+.classification-box {
+    flex: 1;
+    margin: 4px; 
+    padding: 8px 0; 
+    background-color: #B2EA6D; 
+    border: 2px solid #5FB223;
+    border-radius: 10px; 
+    text-align: center;
+    /* Fuente pequeña para que quepan varias categorías */
+    font-size: 0.7rem; 
+    font-weight: 700;
+    color: #5FB223;
+    transition: background-color 0.2s, transform 0.1s;
+    cursor: default;
+    user-select: none;
+    min-height: 55px; 
+    
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    /* Manejo de texto largo en móvil */
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis; 
+}
+
+.classification-box.drag-over {
+    background-color: #71BC14; 
+    color: #FFFFFF;
+    transform: scale(1.05);
+    box-shadow: 0 0 10px rgba(113, 188, 20, 0.5);
+}
+
+/* -------------------------------------------------------------------------- */
+/* ESTILOS DE FEEDBACK DE PUNTUACIÓN */
+/* -------------------------------------------------------------------------- */
+
+.feedback {
+    position: absolute;
+    opacity: 0;
+    font-size: 1.2rem; 
+    font-weight: 800;
+    transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none;
+    z-index: 20; 
+    text-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+}

@@ -1,0 +1,15 @@
+{
+    "GAME_CONFIG": {
+        "GAME_DURATION": 60,
+        "SCORE_CORRECT": 10,
+        "SCORE_INCORRECT": -10,
+        "FALL_SPEED": 1.5,
+        "WORD_CREATION_INTERVAL": 1500
+    },
+    "GAME_DATA": {
+        "REPTILES": ["Iguana", "Serpiente", "Cocodrilo", "Gecko", "Tortuga"],
+        "MAMÍFEROS": ["Perro", "Gato", "Murciélago", "Vaca", "Elefante"],
+        "INSECTOS": ["Mariposa", "Hormiga", "Mosquito", "Abeja", "Libélula"],
+        "AVES": ["Quetzal", "Colibrí", "Águila", "Loro", "Pato"]
+    }
+}
